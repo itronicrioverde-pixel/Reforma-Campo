@@ -84,7 +84,7 @@ let gpScheduled=false;
 const gpObserver=new MutationObserver(()=>{
  if(gpScheduled)return;
  gpScheduled=true;
- queueMicrotask(()=>{gpScheduled=false;gpEnsureMenu();});
+ queueMicrotask(()=>{gpScheduled=false;gpEnsureMenu();if(gpCurrentModule){const main=document.querySelector('#root main');if(main&&gpModuleHost&&!main.contains(gpModuleHost)){main.append(gpModuleHost);main.classList.add('gp-module-active');}}});
 });
 gpObserver.observe(document.getElementById('root'),{childList:true,subtree:true});
 gpEnsureMenu();
