@@ -1,15 +1,17 @@
+import {schedule} from './finance-core.mjs';
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js';
 import {getFirestore,doc,getDocFromServer,runTransaction,onSnapshot} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js';
 const config={apiKey:'AIzaSyCfjcPvoYtww42RsBk6S00jbDPp7nvfEC4',authDomain:'reforma-campo.firebaseapp.com',projectId:'reforma-campo',storageBucket:'reforma-campo.firebasestorage.app',messagingSenderId:'531348775748',appId:'1:531348775748:web:5332faceee90bf00eaad11'};
 const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
-const buckets=['expenses','donations','income'],owner='itronicrioverde@gmail.com';
+const legacyBuckets=['expenses','donations','income'];
+const buckets=[...legacyBuckets,'banks','loans'],owner='itronicrioverde@gmail.com';
 let stopped=[],cache={},saving=0;
 const status=document.getElementById('cloud-status'),gate=document.getElementById('cloud-gate'),error=document.getElementById('cloud-error');
 const empty=()=>({items:[],version:1});
 const reference=b=>doc(db,'reforma',b);
 const authorized=()=>auth.currentUser?.email===owner&&auth.currentUser?.emailVerified;
-function showError(e){error.textContent=e?.code==='auth/popup-blocked'?'O navegador bloqueou a janela. Permita pop-ups para entrar.':e?.code==='permission-denied'?'Sua conta não tem acesso aos dados. Entre com a conta da gestão.':e?.message||'Não foi possível conectar. Tente novamente.';}
+function showError(e){error.textContent=e?.code==='auth/popup-blocked'?'O navegador bloqueou a janela. Permita pop-ups para entrar.':e?.code==='permission-denied'?'Acesso negado pelo Firebase. Confira conta verificada da gestão e regras publicadas; as coleções banks/loans exigem as regras desta versão. Nenhuma regra foi reduzida.':e?.message||'Não foi possível conectar. Tente novamente.';}
 function stateLabel(s){status.textContent=s;}
 function accept(b,data){cache[b]=data;window.dispatchEvent(new CustomEvent('gp-cloud-'+b,{detail:data}));window.dispatchEvent(new Event('gp-cloud-change'));}
 window.gpCloudFetch=async(url,options={})=>{
@@ -30,9 +32,10 @@ window.gpExport=async()=>{try{const values=await Promise.all(buckets.map(async b
 function download(data){const u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='Green_Park_Backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 function validate(data){
  const root=data?.data||data,out={};
- for(const b of buckets){const items=root[b]?.items;if(!Array.isArray(items)||items.length>2000)throw Error('Backup inválido: faltam registros de '+b+'.');
+ for(const b of buckets){const items=root[b]?.items??(!legacyBuckets.includes(b)?[]:undefined);if(!Array.isArray(items)||items.length>2000)throw Error('Backup inválido: faltam registros de '+b+'.');
   const seen=new Set();for(const i of items){if(!i||typeof i.id!=='string'||!i.id||seen.has(i.id)||typeof i.name!=='string'||!i.name.trim())throw Error('Backup com registros inválidos ou duplicados.');seen.add(i.id);
    const amount=n=>Number.isSafeInteger(n)&&n>=0;
+   if(b==='loans'){schedule(i);if(!['simulation','contracted'].includes(i.status)||typeof i.bankId!=='string'||!i.payments||typeof i.payments!=='object'||Array.isArray(i.payments)||Object.entries(i.payments).some(([n,d])=>!/^\d+$/.test(n)||Number(n)<1||Number(n)>i.count||typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d))||(i.status==='simulation'&&Object.keys(i.payments).length))throw Error('Contrato inválido.');}
    if(b==='expenses'&&(!amount(i.estimate)||!amount(i.paid)||!(i.actual===null||amount(i.actual))||i.paid>(i.actual??0)))throw Error('Valores inválidos nas despesas.');
    if(b==='income'&&(!amount(i.amount)||i.amount===0))throw Error('Valor inválido em arrecadação.');
    if(b==='donations'&&(!(Number.isFinite(i.quantity)&&i.quantity>0)||typeof i.donor!=='string'||!(i.estimatedValue==null||amount(i.estimatedValue))))throw Error('Valor inválido nos itens recebidos.');
@@ -41,7 +44,7 @@ function validate(data){
 }
 async function importData(data){
  const incoming=validate(data),counts=buckets.map(b=>incoming[b].items.length);
- if(!confirm('Importar '+counts[0]+' despesas, '+counts[1]+' itens e '+counts[2]+' arrecadações? Registros novos serão somados; os que já existem serão preservados.'))return;
+ if(!confirm('Importar '+counts[0]+' despesas, '+counts[1]+' itens e '+counts[2]+' arrecadações, '+counts[3]+' bancos e '+counts[4]+' operações? Registros novos serão somados; os que já existem serão preservados.'))return;
  if(!authorized()||!navigator.onLine)throw Error('Entre na conta da gestão e conecte à internet.');
  stateLabel('Importando registros…');
  const result=await runTransaction(db,async tx=>{
