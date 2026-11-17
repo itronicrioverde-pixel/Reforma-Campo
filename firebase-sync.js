@@ -43,9 +43,25 @@ function ensureEventsMenu(){
   button.addEventListener('click',()=>{window.location.href='./eventos.html'});
   after.after(button);
 }
-const loansMenuObserver=new MutationObserver(()=>{ensureLoansMenu();ensureEventsMenu()});
+function ensureAssistantMenu(){
+  const nav=document.querySelector('#project-menu nav.drawerLinks');
+  if(!nav||nav.querySelector('[data-gp-assistant]'))return;
+  const after=nav.querySelector('[data-gp-events]')||nav.querySelector('[data-gp-loans]')||Array.from(nav.querySelectorAll('button')).find(b=>b.querySelector('.drawerLinkText strong')?.textContent.trim()==='Despesas');
+  if(!after)return;
+  const button=after.cloneNode(true);
+  button.classList.remove('selected');button.removeAttribute('aria-current');
+  button.setAttribute('data-gp-assistant','true');
+  button.setAttribute('aria-label','Abrir Green Park IA');
+  const label=button.querySelector('.drawerLinkText strong');
+  const hint=button.querySelector('.drawerLinkText small');
+  if(label)label.textContent='Green Park IA';
+  if(hint)hint.textContent='Análises e orientações da gestão';
+  button.addEventListener('click',()=>{window.location.href='./greenpark-ia.html'});
+  after.after(button);
+}
+const loansMenuObserver=new MutationObserver(()=>{ensureLoansMenu();ensureEventsMenu();ensureAssistantMenu()});
 loansMenuObserver.observe(document.getElementById('root'),{childList:true,subtree:true});
-ensureLoansMenu();ensureEventsMenu();
+ensureLoansMenu();ensureEventsMenu();ensureAssistantMenu();
 const reference=b=>doc(db,'reforma',b);
 const authorized=()=>auth.currentUser?.email===owner&&auth.currentUser?.emailVerified;
 function showError(e){error.textContent=e?.code==='auth/popup-blocked'?'O navegador bloqueou a janela. Permita pop-ups para entrar.':e?.code==='permission-denied'?'Sua conta não tem acesso aos dados. Entre com a conta da gestão.':e?.message||'Não foi possível conectar. Tente novamente.';}
