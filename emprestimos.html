@@ -11,6 +11,14 @@ body::before{content:"";position:fixed;inset:0;z-index:-2;background:url('data:i
 body::after{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradient(135deg,rgba(20,45,30,.13),rgba(20,44,28,.28));pointer-events:none}
 header{background:rgba(247,252,245,.77);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px)}
 .card{background:rgba(255,255,255,.91);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-color:rgba(255,255,255,.65);box-shadow:0 8px 28px rgba(12,30,19,.10)}
+
+/* Contraste legível sobre a fotografia fixa do campo. */
+.top>div:first-child{background:rgba(248,252,247,.95);border:1px solid rgba(255,255,255,.85);border-radius:14px;padding:18px 22px;box-shadow:0 8px 28px rgba(14,36,22,.16);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);max-width:710px}
+.top .eyebrow{color:#24583b;font-weight:750;letter-spacing:.10em}
+.top h1{color:#183e2b;font-weight:750;text-shadow:none}
+.top p{color:#355442;font-weight:550;line-height:1.55}
+main>.muted{display:inline-block;background:rgba(248,252,247,.94);color:#355442;border-radius:8px;padding:9px 13px}
+@media(max-width:650px){.top>div:first-child{width:100%;padding:16px}.top h1{font-size:27px}}
 </style></head><body>
 <header><div class="head"><div><strong>Green Park FC</strong><small>Reforma do Campo · Financeiro</small></div><div class="links"><a href="./">← Voltar ao painel</a><button id="logout" hidden>Sair</button></div></div></header>
 <div id="gate" class="login card"><h1>Empréstimos</h1><p>Acesso reservado à gestão do Green Park FC.</p><button class="primary" id="login">Entrar com Google</button><p class="error" id="login-error" role="alert"></p></div>
