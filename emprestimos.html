@@ -40,7 +40,9 @@ function render(){
  for(const x of [...items].reverse()){
   const article=document.createElement('article');article.className='entry';
   article.innerHTML='<div class="entryhead"><h3>'+safe(x.name)+'</h3><span class="tag '+(x.status==='contratado'?'real':'')+'">'+(x.status==='contratado'?'Contratado':'Simulação')+'</span></div><div class="entryDetails"><div><small>Valor líquido</small><strong>'+brl(x.net)+'</strong></div><div><small>Valor total</small><strong>'+brl(x.gross)+'</strong></div><div><small>Parcelamento</small><strong>'+x.installments+'x '+brl(x.installmentValue)+'</strong></div><div><small>Intermediação</small><strong>'+brl(x.intermediation)+'</strong></div><div><small>Taxa parcelamento</small><strong>'+brl(x.parcelFee)+'</strong></div><div><small>Recebimento</small><strong>'+safe(x.receive||'Não informado')+'</strong></div></div>'+'<div class="assocPanel"><strong>Divisão entre '+(x.associates||1)+' associados</strong><div class="assocGrid"><div class="stat"><span>Total por associado (ano)</span><strong>'+brl(Math.round(x.gross/(x.associates||1)))+'</strong></div><div class="stat"><span>Mensal em 12 meses</span><strong>'+brl(Math.round(x.gross/(x.associates||1)/12))+'</strong></div><div class="stat"><span>Total em 6 meses</span><strong>'+brl(Math.round(x.gross/(x.associates||1)/2))+'</strong></div><div class="stat"><span>Mensal para quitar em 6 meses</span><strong>'+brl(Math.round(x.gross/(x.associates||1)/6))+'</strong></div></div></div>'+(x.notes?'<p class="muted">'+safe(x.notes)+'</p>':'')+'<div class="actions"><button data-action="edit">Editar</button><button data-action="delete">Excluir</button></div>';
+  article.querySelector('[data-action="edit"]').hidden=!allowed();
   article.querySelector('[data-action="edit"]').onclick=()=>openForm(x);
+  article.querySelector('[data-action="delete"]').hidden=!allowed();
   article.querySelector('[data-action="delete"]').onclick=()=>remove(x);
   container.append(article);
  }
@@ -59,8 +61,9 @@ $('login').onclick=async()=>{try{$('login-error').textContent='';await signInWit
 $('logout').onclick=()=>signOut(auth);
 onAuthStateChanged(auth,user=>{
  if(stop){stop();stop=null}ready=false;
- const ok=allowed();$('gate').hidden=ok;$('app').hidden=!ok;$('logout').hidden=!ok;
- if(!ok){$('login-error').textContent=user?'Esta conta não tem acesso aos registros do Green Park FC.':'';return}
+ const ok=allowed();$('gate').hidden=true;$('app').hidden=false;$('logout').hidden=!ok;
+ $('add').hidden=!ok;$('use-example').hidden=!ok;
+ $('sync').textContent=ok?'Carregando seus empréstimos…':'Consulta pública · somente leitura';
  $('sync').textContent='Conectando ao Firebase…';
  stop=onSnapshot(ref,{includeMetadataChanges:true},snap=>{if(snap.metadata.fromCache){$('sync').textContent='Sem confirmação online';return}current=snap.exists()?snap.data():{items:[],version:1};ready=true;render();$('sync').textContent='Dados sincronizados online'},e=>{$('sync').textContent='Erro de sincronização: '+e.message});
 });

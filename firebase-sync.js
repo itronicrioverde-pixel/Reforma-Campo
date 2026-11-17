@@ -69,11 +69,11 @@ function stateLabel(s){status.textContent=s;}
 function accept(b,data){cache[b]=data;window.dispatchEvent(new CustomEvent('gp-cloud-'+b,{detail:data}));window.dispatchEvent(new Event('gp-cloud-change'));}
 window.gpCloudFetch=async(url,options={})=>{
  try{
-  if(!authorized())throw Error('Entre na conta da gestão para acessar os registros.');
-  if(!navigator.onLine)throw Error('Sem internet. O lançamento não foi enviado. Mantenha o formulário aberto e tente novamente.');
+  if(!navigator.onLine)throw Error('Sem internet. Não foi possível consultar ou salvar dados.');
   const b=url.split('/').pop();if(!buckets.includes(b))throw Error('Registro desconhecido.');
   let result;
   if(options.method==='PUT'){
+   if(!authorized())throw Error('Para salvar alterações, entre com a conta de administração.');
    const next=JSON.parse(String(options.body));if(!Array.isArray(next.items)||next.items.length>2000)throw Error('Limite de registros atingido.');
    saving++;stateLabel('Salvando no banco…');
    try{result=await runTransaction(db,async tx=>{const snap=await tx.get(reference(b)),current=snap.exists()?snap.data():empty();if(current.version!==next.version)throw Error('Os dados mudaram em outro aparelho. Atualize a lista antes de salvar novamente.');const data={items:next.items,version:current.version+1};tx.set(reference(b),data);return data;});accept(b,result);}finally{saving--}
@@ -116,8 +116,21 @@ window.addEventListener('offline',()=>stateLabel('Sem internet · reconecte para
 window.addEventListener('online',()=>stateLabel('Reconectando ao banco…'));
 onAuthStateChanged(auth,async user=>{
  stopped.forEach(fn=>fn());stopped=[];cache={};
- if(!user||!authorized()){gate.hidden=false;document.getElementById('app-shell').hidden=true;stateLabel('Entre para conectar ao banco');if(user)showError(Error('Acesso reservado a '+owner+'. Troque de conta.'));return}
- error.textContent='';gate.hidden=true;document.getElementById('app-shell').hidden=false;stateLabel('Conectando ao banco…');
+ // O acesso público é somente leitura; gravações permanecem protegidas no Firestore.
+ error.textContent='';gate.hidden=true;document.getElementById('app-shell').hidden=false;
+ document.getElementById('cloud-logout').hidden=!authorized();
+ document.getElementById('cloud-import').hidden=!authorized();
+ document.getElementById('cloud-local').hidden=!authorized();
+ let adminButton=document.getElementById('gp-public-admin');
+ if(!adminButton){adminButton=document.createElement('button');adminButton.id='gp-public-admin';adminButton.textContent='Entrar para editar';adminButton.onclick=()=>document.getElementById('cloud-login').click();document.getElementById('cloud-logout').before(adminButton);}
+ adminButton.hidden=authorized();
+ if(!document.getElementById('gp-public-message')){
+  const banner=document.createElement('div');banner.id='gp-public-message';banner.setAttribute('role','status');
+  banner.style.cssText='padding:9px 16px;text-align:center;background:#f0f6e8;color:#24553d;font-size:12px;border-bottom:1px solid #d9e7d2';
+  document.querySelector('.cloudBar').after(banner);
+ }
+ document.getElementById('gp-public-message').textContent=authorized()?'Modo administração · alterações permitidas':'Visualização pública · para adicionar ou editar lançamentos, entre como administrador.';
+ stateLabel('Conectando ao banco…');
  for(const b of buckets)stopped.push(onSnapshot(reference(b),{includeMetadataChanges:true},snap=>{if(snap.metadata.fromCache)return;accept(b,snap.exists()?snap.data():empty());if(!saving)stateLabel('Conectado · atualização automática')},e=>{showError(e);stateLabel('Falha ao sincronizar · atualize a página')}));
  if(!window.gpMounted){window.gpMounted=true;window.dispatchEvent(new Event('gp-start'));}
 });
