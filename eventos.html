@@ -43,4 +43,31 @@ for(const x of [...items].reverse()){const el=document.createElement('article');
 $('login').onclick=async()=>{try{$('auth-error').textContent='';await signInWithPopup(auth,new GoogleAuthProvider())}catch(e){$('auth-error').textContent=e.message}};$('logout').onclick=()=>signOut(auth);
 onAuthStateChanged(auth,user=>{if(unsubscribe){unsubscribe();unsubscribe=null}const ok=authorized();$('gate').hidden=true;$('app').hidden=false;$('logout').hidden=!ok;$('save-sim').hidden=!ok;$('save-real').hidden=!ok;
 $('sync').textContent='Conectando ao banco…';unsubscribe=onSnapshot(reference,{includeMetadataChanges:true},snap=>{if(snap.metadata.fromCache){$('sync').textContent='Aguardando confirmação online';return}items=snap.exists()?snap.data().items||[]:[];render();$('sync').textContent='Dados sincronizados online'},e=>{$('sync').textContent='Erro no Firebase: '+e.message})});
+</script><script>
+/* Comportamento comum às abas integradas no painel Green Park FC. */
+if(new URLSearchParams(location.search).get('integrado')==='1'){
+ document.documentElement.classList.add('gp-embedded');
+ const css=document.createElement('style');
+ css.textContent=`
+ html.gp-embedded,html.gp-embedded body{background:transparent!important;min-height:0!important}
+ html.gp-embedded body::before,html.gp-embedded body::after{display:none!important}
+ html.gp-embedded header{display:none!important}
+ html.gp-embedded main{padding:0!important;max-width:none!important;margin:0!important}
+ html.gp-embedded .sheet,html.gp-embedded .card{background:rgba(255,255,255,.91);border:1px solid rgba(255,255,255,.75);box-shadow:0 8px 26px rgba(11,33,19,.09);backdrop-filter:blur(12px)}
+ html.gp-embedded .top>div:first-child{background:rgba(248,252,247,.94);border:1px solid rgba(255,255,255,.8);border-radius:14px;padding:18px 22px}
+ html.gp-embedded .top h1{color:#173e2a;font-weight:750}
+ html.gp-embedded .top p{color:#355442}
+ html.gp-embedded .top .eyebrow,html.gp-embedded .top .overline{color:#24583b}
+ html.gp-embedded #gate{margin:20px auto}
+ @media(max-width:650px){html.gp-embedded .top>div:first-child{padding:14px;width:100%}}
+ `;
+ document.head.append(css);
+ const report=()=>requestAnimationFrame(()=>{
+  const height=Math.max(document.body.scrollHeight,document.documentElement.scrollHeight,400);
+  parent.postMessage({type:'gp-embedded-height',height},location.origin);
+ });
+ new ResizeObserver(report).observe(document.body);
+ window.addEventListener('load',report);
+ setTimeout(report,0);
+}
 </script></body></html>

@@ -7,61 +7,108 @@ const buckets=['expenses','donations','income','loans','events'],owner='itronicr
 let stopped=[],cache={},saving=0;
 const status=document.getElementById('cloud-status'),gate=document.getElementById('cloud-gate'),error=document.getElementById('cloud-error');
 const empty=()=>({items:[],version:1});
-// Acrescenta Empréstimos ao menu lateral já existente, logo após Despesas.
-// O menu é renderizado pelo aplicativo React original; nenhum lançamento é modificado.
-function ensureLoansMenu(){
-  const nav=document.querySelector('#project-menu nav.drawerLinks');
-  if(!nav||nav.querySelector('[data-gp-loans]'))return;
-  const expenseButton=Array.from(nav.querySelectorAll('button')).find(button=>button.querySelector('.drawerLinkText strong')?.textContent.trim()==='Despesas');
-  if(!expenseButton)return;
-  const button=expenseButton.cloneNode(true);
-  button.classList.remove('selected');
-  button.removeAttribute('aria-current');
-  button.setAttribute('data-gp-loans','true');
-  button.setAttribute('aria-label','Abrir Empréstimos');
-  const label=button.querySelector('.drawerLinkText strong');
-  const hint=button.querySelector('.drawerLinkText small');
-  if(label)label.textContent='Empréstimos';
-  if(hint)hint.textContent='Créditos e divisão entre associados';
-  button.addEventListener('click',()=>{window.location.href='./emprestimos.html'});
-  expenseButton.after(button);
+
+/* Abas integradas na estrutura única de navegação do painel original. */
+const gpModules={
+ loans:{label:'Empréstimos',hint:'Créditos e divisão entre associados',src:'./emprestimos.html?integrado=1'},
+ events:{label:'Eventos',hint:'Festas, feijoadas e torneios',src:'./eventos.html?integrado=1'},
+ assistant:{label:'Green Park IA',hint:'Análises e orientações da gestão',src:'./greenpark-ia.html?integrado=1'}
+};
+let gpCurrentModule=null,gpModuleHost=null,gpFrame=null;
+const gpStyle=document.createElement('style');
+gpStyle.textContent=`
+#root main.gp-module-active > :not(.gp-module-host){display:none!important}
+#root main.gp-module-active{max-width:1248px;padding:24px 24px 40px}
+#root main .gp-module-host{display:block;width:100%;min-height:400px}
+#root main .gp-module-host iframe{display:block;border:0;background:transparent;width:100%;min-height:400px}
+#project-menu .drawerLinks [data-gp-module].selected{background:#eaf3e9}
+@media(max-width:650px){#root main.gp-module-active{padding:16px}}
+`;
+document.head.append(gpStyle);
+function gpHighlightMenu(){
+ const nav=document.querySelector('#project-menu nav.drawerLinks');
+ if(!nav)return;
+ for(const b of nav.querySelectorAll('button')){
+  const isActive=!!gpCurrentModule&&b.dataset.gpModule===gpCurrentModule;
+  if(b.dataset.gpModule){b.classList.toggle('selected',isActive);if(isActive)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
+  else if(gpCurrentModule){b.classList.remove('selected');b.removeAttribute('aria-current')}
+ }
 }
-function ensureEventsMenu(){
-  const nav=document.querySelector('#project-menu nav.drawerLinks');
-  if(!nav||nav.querySelector('[data-gp-events]'))return;
-  const after=nav.querySelector('[data-gp-loans]')||Array.from(nav.querySelectorAll('button')).find(b=>b.querySelector('.drawerLinkText strong')?.textContent.trim()==='Despesas');
-  if(!after)return;
-  const button=after.cloneNode(true);
-  button.classList.remove('selected');
-  button.removeAttribute('aria-current');
-  button.setAttribute('data-gp-events','true');
-  button.setAttribute('aria-label','Abrir Eventos');
-  const label=button.querySelector('.drawerLinkText strong');
-  const hint=button.querySelector('.drawerLinkText small');
-  if(label)label.textContent='Eventos';
-  if(hint)hint.textContent='Festas, feijoadas e torneios';
-  button.addEventListener('click',()=>{window.location.href='./eventos.html'});
-  after.after(button);
+function gpShowModule(key,push=true){
+ if(!gpModules[key])return;
+ const main=document.querySelector('#root main');
+ if(!main)return;
+ if(!gpModuleHost||!main.contains(gpModuleHost)){
+  gpModuleHost=document.createElement('div');gpModuleHost.className='gp-module-host';
+  gpFrame=document.createElement('iframe');gpFrame.title='Área '+gpModules[key].label;
+  gpFrame.setAttribute('loading','eager');gpModuleHost.append(gpFrame);main.append(gpModuleHost);
+ }
+ gpCurrentModule=key;main.classList.add('gp-module-active');
+ const desired=new URL(gpModules[key].src,location.href).href;
+ if(gpFrame.src!==desired){gpFrame.style.height='900px';gpFrame.src=desired;}
+ gpFrame.title='Área '+gpModules[key].label;gpHighlightMenu();
+ const menu=document.getElementById('project-menu');if(menu?.open)menu.close();
+ if(push){history.pushState({gpModule:key},'', '#'+key);}
+ window.scrollTo({top:0,behavior:'instant'});
 }
-function ensureAssistantMenu(){
-  const nav=document.querySelector('#project-menu nav.drawerLinks');
-  if(!nav||nav.querySelector('[data-gp-assistant]'))return;
-  const after=nav.querySelector('[data-gp-events]')||nav.querySelector('[data-gp-loans]')||Array.from(nav.querySelectorAll('button')).find(b=>b.querySelector('.drawerLinkText strong')?.textContent.trim()==='Despesas');
-  if(!after)return;
-  const button=after.cloneNode(true);
-  button.classList.remove('selected');button.removeAttribute('aria-current');
-  button.setAttribute('data-gp-assistant','true');
-  button.setAttribute('aria-label','Abrir Green Park IA');
-  const label=button.querySelector('.drawerLinkText strong');
-  const hint=button.querySelector('.drawerLinkText small');
-  if(label)label.textContent='Green Park IA';
-  if(hint)hint.textContent='Análises e orientações da gestão';
-  button.addEventListener('click',()=>{window.location.href='./greenpark-ia.html'});
-  after.after(button);
+function gpLeaveModule(push=true){
+ if(!gpCurrentModule)return;
+ gpCurrentModule=null;
+ document.querySelector('#root main')?.classList.remove('gp-module-active');
+ gpHighlightMenu();
+ if(push)history.pushState({gpModule:null},'',location.pathname+location.search);
 }
-const loansMenuObserver=new MutationObserver(()=>{ensureLoansMenu();ensureEventsMenu();ensureAssistantMenu()});
-loansMenuObserver.observe(document.getElementById('root'),{childList:true,subtree:true});
-ensureLoansMenu();ensureEventsMenu();ensureAssistantMenu();
+function gpEnsureMenu(){
+ const nav=document.querySelector('#project-menu nav.drawerLinks');if(!nav)return;
+ const expense=[...nav.querySelectorAll('button')].find(b=>b.querySelector('.drawerLinkText strong')?.textContent.trim()==='Despesas');
+ if(!expense)return;
+ let previous=expense;
+ for(const [key,meta] of Object.entries(gpModules)){
+  let button=nav.querySelector('[data-gp-module="'+key+'"]');
+  if(!button){
+   button=expense.cloneNode(true);button.dataset.gpModule=key;
+   button.classList.remove('selected');button.removeAttribute('aria-current');
+   button.setAttribute('aria-label','Abrir '+meta.label);
+   const name=button.querySelector('.drawerLinkText strong');
+   const hint=button.querySelector('.drawerLinkText small');
+   if(name)name.textContent=meta.label;
+   if(hint)hint.textContent=meta.hint;
+   button.addEventListener('click',()=>gpShowModule(key));
+  }
+  if(previous.nextElementSibling!==button)previous.after(button);
+  previous=button;
+ }
+ gpHighlightMenu();
+}
+let gpScheduled=false;
+const gpObserver=new MutationObserver(()=>{
+ if(gpScheduled)return;
+ gpScheduled=true;
+ queueMicrotask(()=>{gpScheduled=false;gpEnsureMenu();if(gpCurrentModule){const main=document.querySelector('#root main');if(main&&gpModuleHost&&!main.contains(gpModuleHost)){main.append(gpModuleHost);main.classList.add('gp-module-active');}}});
+});
+gpObserver.observe(document.getElementById('root'),{childList:true,subtree:true});
+gpEnsureMenu();
+document.getElementById('root').addEventListener('click',event=>{
+ if(!gpCurrentModule)return;
+ const button=event.target.closest('#project-menu nav.drawerLinks button:not([data-gp-module])');
+ if(button)gpLeaveModule();
+},true);
+window.addEventListener('message',event=>{
+ if(event.origin!==location.origin||!gpFrame||event.source!==gpFrame.contentWindow)return;
+ const msg=event.data;
+ if(msg?.type==='gp-embedded-height'){
+  const n=Number(msg.height);
+  if(Number.isFinite(n)&&n>=300&&n<30000)gpFrame.style.height=Math.ceil(n+8)+'px';
+ }
+});
+window.addEventListener('popstate',()=>{
+ const key=location.hash.slice(1);
+ if(gpModules[key])gpShowModule(key,false);else gpLeaveModule(false);
+});
+window.addEventListener('gp-start',()=>{
+ const key=location.hash.slice(1);
+ if(gpModules[key])requestAnimationFrame(()=>gpShowModule(key,false));
+});
 const reference=b=>doc(db,'reforma',b);
 const authorized=()=>auth.currentUser?.email===owner&&auth.currentUser?.emailVerified;
 function showError(e){error.textContent=e?.code==='auth/popup-blocked'?'O navegador bloqueou a janela. Permita pop-ups para entrar.':e?.code==='permission-denied'?'Sua conta não tem acesso aos dados. Entre com a conta da gestão.':e?.message||'Não foi possível conectar. Tente novamente.';}
