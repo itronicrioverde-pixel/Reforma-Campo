@@ -3,10 +3,11 @@ import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut} f
 import {getFirestore,doc,getDocFromServer,runTransaction,onSnapshot} from 'https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js';
 const config={apiKey:'AIzaSyCfjcPvoYtww42RsBk6S00jbDPp7nvfEC4',authDomain:'reforma-campo.firebaseapp.com',projectId:'reforma-campo',storageBucket:'reforma-campo.firebasestorage.app',messagingSenderId:'531348775748',appId:'1:531348775748:web:5332faceee90bf00eaad11'};
 const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
-const buckets=['expenses','donations','income'],owner='itronicrioverde@gmail.com';
+const buckets=['expenses','donations','income','loans'],owner='itronicrioverde@gmail.com';
 let stopped=[],cache={},saving=0;
 const status=document.getElementById('cloud-status'),gate=document.getElementById('cloud-gate'),error=document.getElementById('cloud-error');
 const empty=()=>({items:[],version:1});
+const loanLink=document.createElement('a');loanLink.href='./emprestimos.html';loanLink.textContent='Empréstimos';loanLink.style.cssText='display:inline-flex;align-items:center;border:1px solid #dce5d9;border-radius:8px;padding:7px 12px;background:white;color:#216048;text-decoration:none;font-weight:600;font-size:12px';loanLink.hidden=true;document.getElementById('cloud-logout').before(loanLink);
 const reference=b=>doc(db,'reforma',b);
 const authorized=()=>auth.currentUser?.email===owner&&auth.currentUser?.emailVerified;
 function showError(e){error.textContent=e?.code==='auth/popup-blocked'?'O navegador bloqueou a janela. Permita pop-ups para entrar.':e?.code==='permission-denied'?'Sua conta não tem acesso aos dados. Entre com a conta da gestão.':e?.message||'Não foi possível conectar. Tente novamente.';}
@@ -30,12 +31,13 @@ window.gpExport=async()=>{try{const values=await Promise.all(buckets.map(async b
 function download(data){const u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'})),a=document.createElement('a');a.href=u;a.download='Green_Park_Backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
 function validate(data){
  const root=data?.data||data,out={};
- for(const b of buckets){const items=root[b]?.items;if(!Array.isArray(items)||items.length>2000)throw Error('Backup inválido: faltam registros de '+b+'.');
+ for(const b of buckets){const items=b==='loans'&&!root.loans?[]:root[b]?.items;if(!Array.isArray(items)||items.length>2000)throw Error('Backup inválido: faltam registros de '+b+'.');
   const seen=new Set();for(const i of items){if(!i||typeof i.id!=='string'||!i.id||seen.has(i.id)||typeof i.name!=='string'||!i.name.trim())throw Error('Backup com registros inválidos ou duplicados.');seen.add(i.id);
    const amount=n=>Number.isSafeInteger(n)&&n>=0;
    if(b==='expenses'&&(!amount(i.estimate)||!amount(i.paid)||!(i.actual===null||amount(i.actual))||i.paid>(i.actual??0)))throw Error('Valores inválidos nas despesas.');
    if(b==='income'&&(!amount(i.amount)||i.amount===0))throw Error('Valor inválido em arrecadação.');
    if(b==='donations'&&(!(Number.isFinite(i.quantity)&&i.quantity>0)||typeof i.donor!=='string'||!(i.estimatedValue==null||amount(i.estimatedValue))))throw Error('Valor inválido nos itens recebidos.');
+   if(b==='loans'&&(!amount(i.net)||i.net===0||!amount(i.gross)||i.gross<i.net||!['simulacao','contratado'].includes(i.status)||!Number.isInteger(i.installments)||i.installments<1))throw Error('Valores inválidos nos empréstimos.');
   }out[b]={items,version:1};
  }return out;
 }
@@ -59,6 +61,7 @@ window.addEventListener('offline',()=>stateLabel('Sem internet · reconecte para
 window.addEventListener('online',()=>stateLabel('Reconectando ao banco…'));
 onAuthStateChanged(auth,async user=>{
  stopped.forEach(fn=>fn());stopped=[];cache={};
+ loanLink.hidden=!authorized();
  if(!user||!authorized()){gate.hidden=false;document.getElementById('app-shell').hidden=true;stateLabel('Entre para conectar ao banco');if(user)showError(Error('Acesso reservado a '+owner+'. Troque de conta.'));return}
  error.textContent='';gate.hidden=true;document.getElementById('app-shell').hidden=false;stateLabel('Conectando ao banco…');
  for(const b of buckets)stopped.push(onSnapshot(reference(b),{includeMetadataChanges:true},snap=>{if(snap.metadata.fromCache)return;accept(b,snap.exists()?snap.data():empty());if(!saving)stateLabel('Conectado · atualização automática')},e=>{showError(e);stateLabel('Falha ao sincronizar · atualize a página')}));
