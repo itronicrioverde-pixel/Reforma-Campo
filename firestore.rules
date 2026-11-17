@@ -7,13 +7,13 @@ service cloud.firestore {
         && request.auth.token.email_verified == true;
     }
     match /reforma/{bucket} {
-      allow read: if owner() && bucket in ['expenses', 'income', 'donations', 'loans'];
-      allow create: if owner() && bucket in ['expenses', 'income', 'donations', 'loans']
+      allow read: if owner() && bucket in ['expenses', 'income', 'donations', 'loans', 'events'];
+      allow create: if owner() && bucket in ['expenses', 'income', 'donations', 'loans', 'events']
         && request.resource.data.keys().hasOnly(['items','version'])
         && request.resource.data.items is list
         && request.resource.data.items.size() <= 2000
         && request.resource.data.version == 2;
-      allow update: if owner() && bucket in ['expenses', 'income', 'donations', 'loans']
+      allow update: if owner() && bucket in ['expenses', 'income', 'donations', 'loans', 'events']
         && request.resource.data.keys().hasOnly(['items','version'])
         && request.resource.data.items is list
         && request.resource.data.items.size() <= 2000
