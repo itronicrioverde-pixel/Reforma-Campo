@@ -7,7 +7,28 @@ const buckets=['expenses','donations','income','loans'],owner='itronicrioverde@g
 let stopped=[],cache={},saving=0;
 const status=document.getElementById('cloud-status'),gate=document.getElementById('cloud-gate'),error=document.getElementById('cloud-error');
 const empty=()=>({items:[],version:1});
-const loanLink=document.createElement('a');loanLink.href='./emprestimos.html';loanLink.textContent='Empréstimos';loanLink.style.cssText='align-items:center;border:1px solid #dce5d9;border-radius:8px;padding:7px 12px;background:white;color:#216048;text-decoration:none;font-weight:600;font-size:12px';loanLink.style.display='none';document.getElementById('cloud-logout').before(loanLink);
+// Acrescenta Empréstimos ao menu lateral já existente, logo após Despesas.
+// O menu é renderizado pelo aplicativo React original; nenhum lançamento é modificado.
+function ensureLoansMenu(){
+  const nav=document.querySelector('#project-menu nav.drawerLinks');
+  if(!nav||nav.querySelector('[data-gp-loans]'))return;
+  const expenseButton=Array.from(nav.querySelectorAll('button')).find(button=>button.querySelector('.drawerLinkText strong')?.textContent.trim()==='Despesas');
+  if(!expenseButton)return;
+  const button=expenseButton.cloneNode(true);
+  button.classList.remove('selected');
+  button.removeAttribute('aria-current');
+  button.setAttribute('data-gp-loans','true');
+  button.setAttribute('aria-label','Abrir Empréstimos');
+  const label=button.querySelector('.drawerLinkText strong');
+  const hint=button.querySelector('.drawerLinkText small');
+  if(label)label.textContent='Empréstimos';
+  if(hint)hint.textContent='Créditos e divisão entre associados';
+  button.addEventListener('click',()=>{window.location.href='./emprestimos.html'});
+  expenseButton.after(button);
+}
+const loansMenuObserver=new MutationObserver(ensureLoansMenu);
+loansMenuObserver.observe(document.getElementById('root'),{childList:true,subtree:true});
+ensureLoansMenu();
 const reference=b=>doc(db,'reforma',b);
 const authorized=()=>auth.currentUser?.email===owner&&auth.currentUser?.emailVerified;
 function showError(e){error.textContent=e?.code==='auth/popup-blocked'?'O navegador bloqueou a janela. Permita pop-ups para entrar.':e?.code==='permission-denied'?'Sua conta não tem acesso aos dados. Entre com a conta da gestão.':e?.message||'Não foi possível conectar. Tente novamente.';}
@@ -61,7 +82,6 @@ window.addEventListener('offline',()=>stateLabel('Sem internet · reconecte para
 window.addEventListener('online',()=>stateLabel('Reconectando ao banco…'));
 onAuthStateChanged(auth,async user=>{
  stopped.forEach(fn=>fn());stopped=[];cache={};
- loanLink.style.display=authorized()?'inline-flex':'none';
  if(!user||!authorized()){gate.hidden=false;document.getElementById('app-shell').hidden=true;stateLabel('Entre para conectar ao banco');if(user)showError(Error('Acesso reservado a '+owner+'. Troque de conta.'));return}
  error.textContent='';gate.hidden=true;document.getElementById('app-shell').hidden=false;stateLabel('Conectando ao banco…');
  for(const b of buckets)stopped.push(onSnapshot(reference(b),{includeMetadataChanges:true},snap=>{if(snap.metadata.fromCache)return;accept(b,snap.exists()?snap.data():empty());if(!saving)stateLabel('Conectado · atualização automática')},e=>{showError(e);stateLabel('Falha ao sincronizar · atualize a página')}));
